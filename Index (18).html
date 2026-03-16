@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Extracto Financiero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+
+/* ── CONFIG — cambiá esta URL por la de tu Web App de Google Apps Script ── */
+/* Ver instrucciones al final del archivo */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #F4F6FB;
+  --surface:  #FFFFFF;
+  --surface2: #EEF1F8;
+  --border:   #E2E6F0;
+  --text:     #0D1B2A;
+  --text2:    #5A6A85;
+  --text3:    #A0AEBF;
+  --blue:     #1847C8;
+  --blue2:    #2D5BE3;
+  --green:    #0C8A4E;
+  --green-bg: #E8F7EF;
+  --red:      #C62B2B;
+  --red-bg:   #FCEAEA;
+  --amber:    #B45309;
+  --amber-bg: #FEF3E2;
+  --radius:   20px;
+  --radius-sm:12px;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: 'Sora', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100svh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer; border: none; background: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+input, select {
+  font-family: inherit;
+  font-size: 16px !important;
+  -webkit-appearance: none;
+}
+
+/* ── SPINNER OVERLAY ─────────────────────────────────── */
+#overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(13,27,42,.6);
+  backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+}
+#overlay.on { display: flex; }
+.spin-ring {
+  width: 48px; height: 48px;
+  border: 3px solid rgba(255,255,255,.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+.spin-label {
+  color: rgba(255,255,255,.8);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── PIN SCREEN ──────────────────────────────────────── */
+#pin-screen {
+  min-height: 100svh;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+}
+
+.pin-hero {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 48px 32px 32px;
+  gap: 0;
+}
+
+.pin-logo-wrap {
+  width: 80px; height: 80px;
+  background: var(--blue);
+  border-radius: 26px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 40px rgba(24,71,200,.25);
+}
+
+.pin-logo-wrap svg {
+  width: 40px; height: 40px;
+  fill: none; stroke: #fff; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.pin-title {
+  font-size: 26px; font-weight: 800;
+  color: var(--text); letter-spacing: -.03em;
+  margin-bottom: 6px; text-align: center;
+}
+
+.pin-sub {
+  font-size: 12px; font-weight: 500;
+  color: var(--text3); letter-spacing: .14em;
+  text-transform: uppercase; margin-bottom: 44px;
+}
+
+.pin-dots {
+  display: flex; gap: 18px;
+}
+
+.pin-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  transition: all .18s;
+}
+.pin-dot.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(24,71,200,.15);
+}
+.pin-dot.err {
+  background: var(--red);
+  border-color: var(--red);
+  animation: shake .4s ease;
+}
+
+@keyframes shake {
+  0%,100%{ transform: translateX(0); }
+  20%    { transform: translateX(-7px); }
+  40%    { transform: translateX(7px); }
+  60%    { transform: translateX(-4px); }
+  80%    { transform: translateX(4px); }
+}
+
+.pin-err {
+  font-size: 13px; font-weight: 600;
+  color: var(--red); margin-top: 16px;
+  min-height: 18px; text-align: center;
+}
+
+/* Teclado — llena el ancho, pegado abajo */
+.pin-keypad {
+  background: var(--surface);
+  border-top: 1.5px solid var(--border);
+  padding: 20px 20px 32px;
+}
+
+.pin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.pin-key {
+  aspect-ratio: 1.5 / 1;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(20px, 5.5vw, 28px);
+  font-weight: 500;
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+  user-select: none;
+}
+.pin-key:active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  transform: scale(.93);
+  box-shadow: 0 4px 16px rgba(24,71,200,.3);
+}
+.pin-key.del { font-size: clamp(16px, 4vw, 22px); color: var(--text2); }
+.pin-key.del:active { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+/* ── APP ─────────────────────────────────────────────── */
+#app {
+  display: none;
+  min-height: 100svh;
+  background: var(--bg);
+  padding-bottom: 100px;
+}
+
+/* Header */
+.header {
+  background: var(--surface);
+  border-bottom: 1.5px solid var(--border);
+  padding: 0 20px;
+  height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 12px rgba(13,27,42,.06);
+}
+
+.header-brand { display: flex; align-items: center; gap: 12px; }
+
+.header-icon {
+  width: 38px; height: 38px;
+  background: var(--blue);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.header-icon svg {
+  width: 20px; height: 20px;
+  fill: none; stroke: #fff; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.header-title {
+  font-size: 17px; font-weight: 800;
+  color: var(--text); letter-spacing: -.02em;
+}
+
+.header-btn {
+  width: 40px; height: 40px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  transition: background .15s;
+}
+.header-btn:active { background: var(--border); }
+
+/* Sync */
+.sync-bar {
+  background: #EEF3FF;
+  border-bottom: 1.5px solid #D6E0FF;
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(12,138,78,.4);
+  animation: pulse 2.5s ease infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+.sync-bar span {
+  font-size: 12px; font-weight: 500;
+  color: #3D5AA8;
+  font-family: 'JetBrains Mono', monospace;
+}
+.sync-bar strong { color: var(--blue); font-weight: 700; }
+
+/* ── BALANCE ─────────────────────────────────────────── */
+.body { padding: 20px 16px 0; }
+
+.bal-card {
+  background: linear-gradient(150deg, #0F2D8A 0%, #1847C8 50%, #2D5BE3 100%);
+  border-radius: var(--radius);
+  padding: 28px 24px 22px;
+  margin-bottom: 16px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 16px 48px rgba(24,71,200,.35);
+}
+
+.bal-card::before {
+  content: '';
+  position: absolute; top: -80px; right: -60px;
+  width: 260px; height: 260px; border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  pointer-events: none;
+}
+
+.bal-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: rgba(255,255,255,.45); margin-bottom: 12px;
+}
+
+.bal-amount { margin-bottom: 28px; position: relative; z-index: 1; }
+
+.bal-currency {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; font-weight: 500;
+  color: rgba(255,255,255,.4);
+  display: block; margin-bottom: 4px;
+}
+
+.bal-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(36px, 10vw, 52px);
+  font-weight: 700; color: #fff;
+  letter-spacing: -.04em; line-height: 1;
+  word-break: break-all;
+}
+.bal-number.neg { color: #FFAAAA; }
+
+.bal-pills {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 10px; position: relative; z-index: 1;
+}
+
+.pill {
+  background: rgba(0,0,0,.2);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px; padding: 14px 8px; text-align: center;
+}
+
+.pill-label {
+  display: block; font-size: 9px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255,255,255,.4); margin-bottom: 8px;
+}
+
+.pill-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 700;
+  color: #fff; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.pill-val.g { color: #6EE7B7; }
+.pill-val.r { color: #FCA5A5; }
+.pill-val.a { color: #FDE68A; }
+
+/* ── FILTROS ─────────────────────────────────────────── */
+.filter-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px; margin-bottom: 16px;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 2px 12px rgba(13,27,42,.05);
+}
+
+.search-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+}
+.search-row:focus-within { border-color: var(--blue); }
+.search-row input {
+  background: none; color: var(--text);
+  font-size: 16px !important; font-weight: 500;
+  flex: 1; border: none; outline: none;
+}
+.search-row input::placeholder { color: var(--text3); }
+.search-ico { font-size: 18px; flex-shrink: 0; }
+
+.dates-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dg { display: flex; flex-direction: column; gap: 6px; }
+.dg label {
+  font-size: 10px; font-weight: 700;
+  color: var(--text3); letter-spacing: .12em; text-transform: uppercase;
+}
+.dg input {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text); padding: 12px 14px;
+  outline: none; width: 100%;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px !important;
+  transition: border-color .2s;
+}
+.dg input:focus { border-color: var(--blue); }
+
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 50px;
+  font-size: 14px; font-weight: 600;
+  color: var(--text2); padding: 9px 20px;
+  transition: all .15s;
+}
+.tab.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(24,71,200,.3);
+}
+
+/* ── LISTA ───────────────────────────────────────────── */
+.list-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.list-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--text3);
+}
+.list-count {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 700;
+  color: var(--text2); padding: 4px 14px;
+}
+
+.mov-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+
+/* Tarjeta de movimiento */
+.mov {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 18px 18px 22px;
+  display: flex; align-items: center; gap: 14px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 2px 10px rgba(13,27,42,.05);
+  transition: transform .1s;
+}
+.mov:active { transform: scale(.99); }
+
+.mov::before {
+  content: ''; position: absolute;
+  left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 4px 4px 0;
+}
+.mov.i::before { background: linear-gradient(180deg,var(--green),#34D399); }
+.mov.e::before { background: linear-gradient(180deg,var(--red),#F87171); }
+.mov.g::before { background: linear-gradient(180deg,var(--amber),#FBBF24); }
+
+.mov-ico {
+  width: 50px; height: 50px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.mov-ico.i { background: var(--green-bg); }
+.mov-ico.e { background: var(--red-bg); }
+.mov-ico.g { background: var(--amber-bg); }
+
+.mov-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+
+.mov-name {
+  font-size: 16px; font-weight: 600;
+  color: var(--text); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.mov-meta { display: flex; align-items: center; gap: 8px; }
+
+.mov-date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text3);
+}
+
+.mov-badge {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 20px;
+}
+.mov-badge.i { background: var(--green-bg); color: var(--green); }
+.mov-badge.e { background: var(--red-bg);   color: var(--red); }
+.mov-badge.g { background: var(--amber-bg); color: var(--amber); }
+
+.mov-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 17px; font-weight: 700;
+  flex-shrink: 0; text-align: right; white-space: nowrap;
+}
+.mov-amount.i { color: var(--green); }
+.mov-amount.e { color: var(--red); }
+.mov-amount.g { color: var(--amber); }
+
+/* ── ESTADOS ─────────────────────────────────────────── */
+.state {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 20px; gap: 14px;
+}
+.state-spin {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+.state-ico { font-size: 40px; }
+.state-txt { font-size: 15px; font-weight: 500; color: var(--text3); }
+
+/* ── FAB ─────────────────────────────────────────────── */
+.fab {
+  position: fixed; bottom: 26px; right: 18px; z-index: 50;
+  background: var(--blue);
+  border: none; border-radius: 20px;
+  color: #fff; font-size: 15px; font-weight: 700;
+  padding: 16px 24px;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 8px 28px rgba(24,71,200,.4);
+  transition: transform .12s;
+}
+.fab:active { transform: scale(.93); }
+
+/* ── PRINT ───────────────────────────────────────────── */
+@media print {
+  body { background: #fff !important; }
+  #overlay, #pin-screen, .header, .sync-bar, .filter-card, .fab { display: none !important; }
+  #app { display: block !important; padding: 0 !important; }
+  .body { padding: 0 !important; }
+  .bal-card { background: #1847C8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; border-radius: 8px !important; margin-bottom: 12px !important; }
+  .mov { box-shadow: none !important; border: 1px solid #e2e8f0 !important; page-break-inside: avoid; }
+  .mov::before { display: none !important; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="spin-ring"></div>
+  <div class="spin-label" id="overlay-txt">Verificando</div>
+</div>
+
+<!-- ═══ PIN ══════════════════════════════════════════ -->
+<div id="pin-screen">
+
+  <div class="pin-hero">
+    <div class="pin-logo-wrap">
+      <svg viewBox="0 0 24 24">
+        <rect x="2" y="5" width="20" height="14" rx="2.5"/>
+        <path d="M2 10h20"/>
+        <circle cx="7" cy="15" r="1.2" fill="#fff" stroke="none"/>
+        <path d="M11 15h7" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="pin-title">Extracto Financiero</div>
+    <div class="pin-sub">Acceso seguro</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+  </div>
+
+  <div class="pin-keypad">
+    <div class="pin-grid">
+      <button class="pin-key" onclick="kp('1')">1</button>
+      <button class="pin-key" onclick="kp('2')">2</button>
+      <button class="pin-key" onclick="kp('3')">3</button>
+      <button class="pin-key" onclick="kp('4')">4</button>
+      <button class="pin-key" onclick="kp('5')">5</button>
+      <button class="pin-key" onclick="kp('6')">6</button>
+      <button class="pin-key" onclick="kp('7')">7</button>
+      <button class="pin-key" onclick="kp('8')">8</button>
+      <button class="pin-key" onclick="kp('9')">9</button>
+      <div></div>
+      <button class="pin-key" onclick="kp('0')">0</button>
+      <button class="pin-key del" onclick="kd()">⌫</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ APP ══════════════════════════════════════════ -->
+<div id="app">
+
+  <div class="header">
+    <div class="header-brand">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24">
+          <rect x="2" y="5" width="20" height="14" rx="2.5"/>
+          <path d="M2 10h20"/>
+          <circle cx="7" cy="15" r="1.2" fill="#fff" stroke="none"/>
+          <path d="M11 15h7" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="header-title">Extracto Financiero</div>
+    </div>
+    <button class="header-btn" onclick="reload()" title="Actualizar">↻</button>
+  </div>
+
+  <div class="sync-bar">
+    <div class="sync-dot"></div>
+    <span>Última carga: <strong id="sync-ts">—</strong></span>
+  </div>
+
+  <div class="body">
+
+    <div class="bal-card">
+      <div class="bal-label">Balance Total</div>
+      <div class="bal-amount">
+        <span class="bal-currency">Gs.</span>
+        <div class="bal-number" id="bal-wrap"><span id="bal-n">—</span></div>
+      </div>
+      <div class="bal-pills">
+        <div class="pill"><span class="pill-label">Ingresos</span><div class="pill-val g" id="pi">—</div></div>
+        <div class="pill"><span class="pill-label">Enviados</span><div class="pill-val r" id="pe">—</div></div>
+        <div class="pill"><span class="pill-label">Gastos</span>  <div class="pill-val a" id="pg">—</div></div>
+      </div>
+    </div>
+
+    <div class="filter-card">
+      <div class="search-row">
+        <span class="search-ico">🔍</span>
+        <input type="text" id="buscar" placeholder="Buscar por nombre o detalle…" oninput="filtrar()">
+      </div>
+      <div class="dates-row">
+        <div class="dg"><label>Desde</label><input type="date" id="fd" onchange="filtrar()"></div>
+        <div class="dg"><label>Hasta</label><input type="date" id="fh" onchange="filtrar()"></div>
+      </div>
+      <div class="tabs">
+        <button class="tab on" onclick="setTab('todos',this)">Todos</button>
+        <button class="tab"    onclick="setTab('ingreso',this)">Ingresos</button>
+        <button class="tab"    onclick="setTab('egreso',this)">Enviados</button>
+        <button class="tab"    onclick="setTab('gasto',this)">Gastos</button>
+      </div>
+    </div>
+
+    <div class="list-header">
+      <div class="list-label">Movimientos</div>
+      <div class="list-count" id="cnt">0</div>
+    </div>
+
+    <div class="mov-list" id="movlist">
+      <div class="state"><div class="state-spin"></div><div class="state-txt">Cargando…</div></div>
+    </div>
+
+  </div>
+
+  <button class="fab" onclick="window.print()">🖨️ Imprimir reporte</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIGURACIÓN — CAMBIÁ ESTA URL
+//  1. En Google Apps Script → Implementar → Nueva implementación
+//  2. Tipo: Aplicación web
+//  3. Ejecutar como: Yo
+//  4. Quién puede acceder: Cualquier usuario
+//  5. Copiá la URL y pegala abajo
+// ══════════════════════════════════════════════════════
+var API_URL = 'https://script.google.com/macros/s/AKfycby2lRw-g6pQPQOJEG7cioZf9V2zzUdn55bBAoQhRxliCluK1CG7Gj0gcZpk2_drsqZE/exec';
+
+// ── Llamada a la API ──────────────────────────────────
+async function api(action, data) {
+  var res = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: action, data: data || {} })
+  });
+  return res.json();
+}
+
+// ── Overlay ───────────────────────────────────────────
+function showOv(t) {
+  document.getElementById('overlay-txt').textContent = t || 'Cargando';
+  document.getElementById('overlay').classList.add('on');
+}
+function hideOv() { document.getElementById('overlay').classList.remove('on'); }
+
+// ── PIN ───────────────────────────────────────────────
+var pin = '', tab = 'todos', movs = [];
+
+function kp(n) {
+  if (pin.length >= 4) return;
+  pin += n; dots(false);
+  if (pin.length === 4) setTimeout(verify, 180);
+}
+function kd() {
+  if (!pin.length) return;
+  pin = pin.slice(0, -1); dots(false);
+  document.getElementById('pin-err').textContent = '';
+}
+function dots(err) {
+  for (var i = 0; i < 4; i++) {
+    var d = document.getElementById('d' + i);
+    d.className = 'pin-dot';
+    if (err) d.classList.add('err');
+    else if (i < pin.length) d.classList.add('on');
+  }
+}
+
+async function verify() {
+  showOv('Verificando');
+  try {
+    var r = await api('verificarPin', { pin: pin });
+    if (r.ok) {
+      document.getElementById('pin-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      showOv('Cargando datos');
+      loadData();
+    } else {
+      hideOv(); dots(true);
+      document.getElementById('pin-err').textContent = 'PIN incorrecto. Intentá de nuevo.';
+      setTimeout(function() { pin = ''; dots(false); document.getElementById('pin-err').textContent = ''; }, 1400);
+    }
+  } catch(e) {
+    hideOv();
+    document.getElementById('pin-err').textContent = 'Error de conexión.';
+    pin = ''; dots(false);
+  }
+}
+
+// ── Datos ─────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('movlist').innerHTML = '<div class="state"><div class="state-spin"></div><div class="state-txt">Cargando…</div></div>';
+  try {
+    var d = await api('obtenerDatos');
+    hideOv();
+    if (!d.ok) {
+      document.getElementById('movlist').innerHTML = '<div class="state"><div class="state-ico">⚠️</div><div class="state-txt">' + esc(d.error || 'Error') + '</div></div>';
+      return;
+    }
+    movs = [].concat(d.movimientosBanco).concat(d.movimientosGastos);
+    movs.sort(function(a, b) { return ts(b.fecha) - ts(a.fecha); });
+    document.getElementById('bal-n').textContent = fmtGs(d.balanceTotal);
+    document.getElementById('bal-wrap').classList.toggle('neg', d.balanceTotal < 0);
+    document.getElementById('pi').textContent = fmtK(d.totalIngresos);
+    document.getElementById('pe').textContent = fmtK(d.totalEgresos);
+    document.getElementById('pg').textContent = fmtK(d.totalGastos);
+    document.getElementById('sync-ts').textContent = d.ultimaActualizacion;
+    filtrar();
+  } catch(e) {
+    hideOv();
+    document.getElementById('movlist').innerHTML = '<div class="state"><div class="state-ico">⚠️</div><div class="state-txt">Error de conexión</div></div>';
+  }
+}
+
+function reload() { showOv('Actualizando'); loadData(); }
+
+function ts(s) {
+  if (!s) return 0;
+  var p = s.split('/');
+  return p.length < 3 ? 0 : new Date(+p[2], +p[1]-1, +p[0]).getTime();
+}
+
+function setTab(t, btn) {
+  tab = t;
+  document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('on'); });
+  btn.classList.add('on'); filtrar();
+}
+
+function filtrar() {
+  var q     = document.getElementById('buscar').value.toLowerCase().trim();
+  var desde = document.getElementById('fd').value;
+  var hasta = document.getElementById('fh').value;
+  var res   = movs.filter(function(m) {
+    if (tab !== 'todos' && m.tipo !== tab) return false;
+    if (q && m.detalle.toLowerCase().indexOf(q) === -1) return false;
+    if (desde && ts(m.fecha) < new Date(desde + 'T00:00:00').getTime()) return false;
+    if (hasta && ts(m.fecha) > new Date(hasta + 'T23:59:59').getTime()) return false;
+    return true;
+  });
+  render(res);
+}
+
+function render(list) {
+  document.getElementById('cnt').textContent = list.length;
+  var el = document.getElementById('movlist');
+  if (!list.length) {
+    el.innerHTML = '<div class="state"><div class="state-ico">🔍</div><div class="state-txt">Sin resultados</div></div>';
+    return;
+  }
+  var ico = { ingreso: '↓', egreso: '↑', gasto: '💸' };
+  var cls = { ingreso: 'i', egreso: 'e', gasto: 'g' };
+  var lbl = { ingreso: 'INGRESO', egreso: 'ENVIADO', gasto: 'GASTO' };
+  var sgn = { ingreso: '+', egreso: '−', gasto: '−' };
+  var html = '';
+  list.forEach(function(m) {
+    var c = cls[m.tipo];
+    html +=
+      '<div class="mov ' + c + '">' +
+        '<div class="mov-ico ' + c + '">' + ico[m.tipo] + '</div>' +
+        '<div class="mov-body">' +
+          '<div class="mov-name">' + esc(m.detalle) + '</div>' +
+          '<div class="mov-meta">' +
+            '<span class="mov-date">' + esc(m.fecha) + '</span>' +
+            '<span class="mov-badge ' + c + '">' + lbl[m.tipo] + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mov-amount ' + c + '">' + sgn[m.tipo] + 'Gs.&nbsp;' + fmtGs(m.monto) + '</div>' +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function fmtGs(n) {
+  if (isNaN(n)) return '0';
+  return (n < 0 ? '-' : '') + Math.abs(Math.round(n)).toLocaleString('es-PY');
+}
+function fmtK(n) {
+  var a = Math.abs(Math.round(n || 0));
+  if (a >= 1e9) return (a/1e9).toFixed(1) + 'B';
+  if (a >= 1e6) return (a/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return (a/1e3).toFixed(0) + 'K';
+  return a.toLocaleString('es-PY');
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
