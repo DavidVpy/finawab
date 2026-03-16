@@ -419,14 +419,14 @@ input, select {
   color: var(--text2); padding: 4px 14px;
 }
 
-.mov-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.mov-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
 
 /* Tarjeta de movimiento */
 .mov {
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px 18px 18px 22px;
+  padding: 14px 14px 14px 18px;
   display: flex; align-items: center; gap: 14px;
   position: relative; overflow: hidden;
   box-shadow: 0 2px 10px rgba(13,27,42,.05);
@@ -444,8 +444,8 @@ input, select {
 .mov.g::before { background: linear-gradient(180deg,var(--amber),#FBBF24); }
 
 .mov-ico {
-  width: 50px; height: 50px;
-  border-radius: 16px;
+  width: 44px; height: 44px;
+  border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
   font-size: 22px; flex-shrink: 0;
 }
@@ -456,7 +456,7 @@ input, select {
 .mov-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
 .mov-name {
-  font-size: 16px; font-weight: 600;
+  font-size: 14px; font-weight: 600;
   color: var(--text); line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -479,7 +479,7 @@ input, select {
 
 .mov-amount {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 17px; font-weight: 700;
+  font-size: 15px; font-weight: 700;
   flex-shrink: 0; text-align: right; white-space: nowrap;
 }
 .mov-amount.i { color: var(--green); }
