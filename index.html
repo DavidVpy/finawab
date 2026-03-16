@@ -435,6 +435,40 @@ input, select {
 }
 .mov:active { transform: scale(.99); }
 
+.mov { flex-wrap: wrap; }
+.mov-top { width: 100%; }
+
+.mov-detail {
+  display: none;
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.mov-detail.open { display: block; }
+
+.mov-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--surface2);
+}
+.mov-detail-row:last-child { border-bottom: none; }
+.mov-detail-row > span:first-child {
+  color: var(--text3);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 52px;
+}
+.mov-detail-row > span:last-child {
+  color: var(--text);
+  text-align: right;
+  word-break: break-word;
+}
+
 .mov::before {
   content: ''; position: absolute;
   left: 0; top: 14px; bottom: 14px;
@@ -660,9 +694,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbxaVmtwGLwasTZA5mEi_9qo7F
 
 // ── Llamada a la API ──────────────────────────────────
 async function api(action, data) {
-  var res = await fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action: action, data: data || {} })
+  var params = new URLSearchParams();
+  params.set('action', action);
+  if (data) params.set('data', JSON.stringify(data));
+  var res = await fetch(API_URL + '?' + params.toString(), {
+    method: 'GET',
+    redirect: 'follow'
   });
   return res.json();
 }
@@ -789,7 +826,7 @@ function render(list) {
   }
   function acortarDetalle(d) {
     d = d.replace(/^Transferencia Recibida de /i, '');
-    d = d.replace(/^Transferencia Enviada a /i, 'A: ');
+    d = d.replace(/^Transferencia Enviada a /i, '');
     return d;
   }
 
@@ -800,20 +837,37 @@ function render(list) {
   var html = '';
   list.forEach(function(m) {
     var c = cls[m.tipo];
+    var detallecompleto = esc(m.detalle);
+    var nombreCorto = esc(acortarDetalle(m.detalle));
     html +=
-      '<div class="mov ' + c + '">' +
-        '<div class="mov-ico ' + c + '">' + ico[m.tipo] + '</div>' +
-        '<div class="mov-body">' +
-          '<div class="mov-name">' + esc(acortarDetalle(m.detalle)) + '</div>' +
-          '<div class="mov-meta">' +
-            '<span class="mov-date">' + esc(m.fecha) + '</span>' +
-            '<span class="mov-badge ' + c + '">' + lbl[m.tipo] + '</span>' +
+      '<div class="mov ' + c + '" onclick="toggleDetalle(this)" style="cursor:pointer">' +
+        '<div class="mov-top" style="display:flex;align-items:center;gap:12px;width:100%">' +
+          '<div class="mov-ico ' + c + '" style="flex-shrink:0">' + ico[m.tipo] + '</div>' +
+          '<div class="mov-body" style="min-width:0;flex:1">' +
+            '<div class="mov-name">' + nombreCorto + '</div>' +
+            '<div class="mov-meta">' +
+              '<span class="mov-date">' + esc(m.fecha) + '</span>' +
+              '<span class="mov-badge ' + c + '">' + lbl[m.tipo] + '</span>' +
+            '</div>' +
           '</div>' +
+          '<div class="mov-amount ' + c + '">' + sgn[m.tipo] + 'Gs.&nbsp;' + fmtGs(m.monto) + '</div>' +
         '</div>' +
-        '<div class="mov-amount ' + c + '">' + sgn[m.tipo] + 'Gs.&nbsp;' + fmtGs(m.monto) + '</div>' +
+        '<div class="mov-detail">' +
+          '<div class="mov-detail-row"><span>Detalle</span><span>' + detallecompleto + '</span></div>' +
+          '<div class="mov-detail-row"><span>Monto</span><span style="color:var(--' + (m.tipo==='ingreso'?'green':m.tipo==='egreso'?'red':'amber') + ')">' + sgn[m.tipo] + ' Gs. ' + fmtGs(m.monto) + '</span></div>' +
+          '<div class="mov-detail-row"><span>Fecha</span><span>' + esc(m.fecha) + '</span></div>' +
+          '<div class="mov-detail-row"><span>Tipo</span><span>' + lbl[m.tipo] + '</span></div>' +
+        '</div>' +
       '</div>';
   });
   el.innerHTML = html;
+}
+
+function toggleDetalle(el) {
+  var detail = el.querySelector('.mov-detail');
+  if (!detail) return;
+  detail.classList.toggle('open');
+  el.classList.toggle('expanded');
 }
 
 function fmtGs(n) {
