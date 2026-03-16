@@ -458,12 +458,8 @@ input, select {
 
 .mov-name {
   font-size: 14px; font-weight: 500;
-  color: var(--text); line-height: 1.3;
-  white-space: normal; overflow: visible;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--text); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .mov-meta { display: flex; align-items: center; gap: 8px; }
@@ -597,10 +593,7 @@ input, select {
       </div>
       <div class="header-title">Extracto Financiero</div>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="header-btn" onclick="imprimirReporte()" title="Imprimir" style="font-size:16px">🖨️</button>
-      <button class="header-btn" onclick="reload()" title="Actualizar">↻</button>
-    </div>
+    <button class="header-btn" onclick="reload()" title="Actualizar">↻</button>
   </div>
 
   <div class="sync-bar">
@@ -795,8 +788,8 @@ function render(list) {
     return;
   }
   function acortarDetalle(d) {
-    d = d.replace(/^Transferencia Recibida de /i, 'Recibida · ');
-    d = d.replace(/^Transferencia Enviada a /i, 'Enviada · ');
+    d = d.replace(/^Transferencia Recibida de /i, '');
+    d = d.replace(/^Transferencia Enviada a /i, 'A: ');
     return d;
   }
 
@@ -838,63 +831,6 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function imprimirReporte() {
-  var tipoLabel = { ingreso: 'Ingreso', egreso: 'Egreso', gasto: 'Gasto' };
-  var totalIng = movs.filter(function(m){ return m.tipo === 'ingreso'; }).reduce(function(s,m){ return s+m.monto; }, 0);
-  var totalEgr = movs.filter(function(m){ return m.tipo !== 'ingreso'; }).reduce(function(s,m){ return s+m.monto; }, 0);
-  var total = totalIng - totalEgr;
-
-  var filas = movs.map(function(m) {
-    var colorMonto = m.tipo === 'ingreso' ? '#0C8A4E' : (m.tipo === 'egreso' ? '#C62B2B' : '#B45309');
-    var signo = m.tipo === 'ingreso' ? '+' : '-';
-    return '<tr>'
-      + '<td>' + esc(m.fecha) + '</td>'
-      + '<td>' + esc(acortarDetalle(m.detalle)) + '</td>'
-      + '<td>' + tipoLabel[m.tipo] + '</td>'
-      + '<td style="text-align:right;color:' + colorMonto + ';font-weight:600">' + signo + ' Gs. ' + fmtGs(m.monto) + '</td>'
-      + '</tr>';
-  }).join('');
-
-  // Inyectar iframe oculto para imprimir sin popup bloqueado
-  var existente = document.getElementById('print-frame');
-  if (existente) existente.remove();
-
-  var iframe = document.createElement('iframe');
-  iframe.id = 'print-frame';
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none';
-  document.body.appendChild(iframe);
-
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Extracto Financiero</title><style>'
-    + '@page{margin:15mm}'
-    + 'body{font-family:Arial,sans-serif;font-size:11px;color:#111}'
-    + 'h1{font-size:16px;margin:0 0 4px;color:#1847C8}'
-    + '.meta{color:#666;font-size:10px;margin-bottom:16px}'
-    + 'table{width:100%;border-collapse:collapse}'
-    + 'th{background:#1847C8;color:#fff;padding:7px 10px;text-align:left;font-size:10px;font-weight:600}'
-    + 'th:last-child{text-align:right}'
-    + 'td{padding:6px 10px;border-bottom:1px solid #e8ecf4;font-size:11px}'
-    + 'tr:nth-child(even) td{background:#f7f9ff}'
-    + '.total td{font-weight:700;background:#EEF3FF!important;border-top:2px solid #1847C8;font-size:12px}'
-    + '</style></head><body>'
-    + '<h1>Extracto Financiero</h1>'
-    + '<div class="meta">Última actualización: ' + esc(document.getElementById('sync-ts').textContent)
-    + ' &nbsp;·&nbsp; ' + movs.length + ' movimientos</div>'
-    + '<table><thead><tr><th>Fecha</th><th>Detalle</th><th>Tipo</th><th style="text-align:right">Monto</th></tr></thead>'
-    + '<tbody>' + filas + '</tbody>'
-    + '<tfoot><tr class="total"><td colspan="3">BALANCE TOTAL</td>'
-    + '<td style="text-align:right;color:' + (total>=0?'#0C8A4E':'#C62B2B') + '">'
-    + (total>=0?'+':'-') + ' Gs. ' + fmtGs(Math.abs(total)) + '</td></tr></tfoot>'
-    + '</table></body></html>';
-
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-
-  iframe.onload = function() {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  };
-}
 </script>
 </body>
 </html>
