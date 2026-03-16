@@ -427,7 +427,7 @@ input, select {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 14px 14px 18px;
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 10px;
   position: relative; overflow: hidden;
   box-shadow: 0 2px 10px rgba(13,27,42,.05);
   transition: transform .1s;
@@ -444,10 +444,10 @@ input, select {
 .mov.g::before { background: linear-gradient(180deg,var(--amber),#FBBF24); }
 
 .mov-ico {
-  width: 44px; height: 44px;
-  border-radius: 14px;
+  width: 36px; height: 36px;
+  border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px; flex-shrink: 0;
+  font-size: 18px; flex-shrink: 0;
 }
 .mov-ico.i { background: var(--green-bg); }
 .mov-ico.e { background: var(--red-bg); }
@@ -482,8 +482,8 @@ input, select {
 .mov-badge.g { background: var(--amber-bg); color: var(--amber); }
 
 .mov-amount {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 15px; font-weight: 700;
+  font-family: 'Sora', sans-serif;
+  font-size: 13px; font-weight: 700;
   flex-shrink: 0; text-align: right; white-space: nowrap;
 }
 .mov-amount.i { color: var(--green); }
@@ -596,7 +596,10 @@ input, select {
       </div>
       <div class="header-title">Extracto Financiero</div>
     </div>
-    <button class="header-btn" onclick="reload()" title="Actualizar">↻</button>
+    <div style="display:flex;gap:8px">
+      <button class="header-btn" onclick="imprimirReporte()" title="Imprimir" style="font-size:16px">🖨️</button>
+      <button class="header-btn" onclick="reload()" title="Actualizar">↻</button>
+    </div>
   </div>
 
   <div class="sync-bar">
@@ -647,7 +650,7 @@ input, select {
 
   </div>
 
-  <button class="fab" onclick="window.print()">🖨️ Imprimir reporte</button>
+
 </div>
 
 <script>
@@ -680,6 +683,15 @@ function hideOv() { document.getElementById('overlay').classList.remove('on'); }
 // ── PIN ───────────────────────────────────────────────
 var pin = '', tab = 'todos', movs = [];
 
+// Auto-login si ya hay sesión activa
+(function() {
+  if (sessionStorage.getItem('ef_auth') === '1') {
+    document.getElementById('pin-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    setTimeout(function() { loadData(); }, 100);
+  }
+})();
+
 function kp(n) {
   if (pin.length >= 4) return;
   pin += n; dots(false);
@@ -704,6 +716,7 @@ async function verify() {
   try {
     var r = await api('verificarPin', { pin: pin });
     if (r.ok) {
+      sessionStorage.setItem('ef_auth', '1');
       document.getElementById('pin-screen').style.display = 'none';
       document.getElementById('app').style.display = 'block';
       showOv('Cargando datos');
@@ -822,6 +835,38 @@ function fmtK(n) {
 }
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function imprimirReporte() {
+  var tipoLabel = { ingreso: 'Ingreso', egreso: 'Egreso', gasto: 'Gasto' };
+  var total = movs.filter(function(m){ return m.tipo === 'ingreso'; }).reduce(function(s,m){ return s+m.monto; }, 0)
+            - movs.filter(function(m){ return m.tipo !== 'ingreso'; }).reduce(function(s,m){ return s+m.monto; }, 0);
+
+  var filas = movs.map(function(m) {
+    return '<tr><td>' + esc(m.fecha) + '</td><td>' + esc(acortarDetalle(m.detalle)) + '</td><td>' + tipoLabel[m.tipo] + '</td><td style="text-align:right">' + (m.tipo==='ingreso'?'+':'-') + ' Gs. ' + fmtGs(m.monto) + '</td></tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Extracto Financiero</title><style>'
+    + 'body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:24px}'
+    + 'h1{font-size:18px;margin-bottom:4px}p{color:#555;margin-bottom:16px;font-size:11px}'
+    + 'table{width:100%;border-collapse:collapse}'
+    + 'th{background:#1847C8;color:#fff;padding:8px 10px;text-align:left;font-size:11px}'
+    + 'td{padding:7px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}'
+    + 'tr:nth-child(even) td{background:#f8faff}'
+    + '.total{font-weight:bold;background:#f0f4ff!important;border-top:2px solid #1847C8}'
+    + '</style></head><body>'
+    + '<h1>Extracto Financiero</h1>'
+    + '<p>Generado el ' + esc(document.getElementById('sync-ts').textContent) + ' &nbsp;|&nbsp; Total de movimientos: ' + movs.length + '</p>'
+    + '<table><thead><tr><th>Fecha</th><th>Detalle</th><th>Tipo</th><th style="text-align:right">Monto</th></tr></thead><tbody>'
+    + filas
+    + '<tr class="total"><td colspan="3">BALANCE TOTAL</td><td style="text-align:right">' + (total>=0?'+':'-') + ' Gs. ' + fmtGs(Math.abs(total)) + '</td></tr>'
+    + '</tbody></table></body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(function(){ w.print(); }, 500);
 }
 </script>
 </body>
